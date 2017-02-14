@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -59,7 +60,8 @@ def Prewitt_plt(path):
     plt.axis("off")
     plt.show()
 
-def Laplace_plt(path):                                                   #直接使用scipy.signal.convolve()函数
+#直接使用scipy.signal.convolve()函数
+def Laplace_plt(path):
     img=Image.open(path).convert('L')
     imgArray=np.array(img)
     imgBlur=signal.convolve2d(imgArray,Gauss,mode='same')
@@ -84,5 +86,5 @@ def Laplace_plt(path):                                                   #直接
     # plt.axis('off')
     plt.show()
 
-path="example.png"
+path="F:\\Python\\try\\BasicImageOperation\\lena.jpg"
 Laplace_plt(path)
