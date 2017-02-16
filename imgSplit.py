@@ -12,6 +12,19 @@ def imgOpen(path):
     img=Image.open(path).convert('L')
     return np.array(img)
 
+def sameSize(imgList):
+    try:
+        row,col=imgList[0].shape
+    except:
+        row,col,dst=imgList[0].shape
+    ret=[]
+    for img in imgList:
+        cvt=Image.fromarray(img)
+        cvt.resize((row,col))
+        mat=np.array(cvt)
+        ret.append(mat)
+    return ret
+
 def getYsize(img,miss=150,begin=0):
     x,y=img.shape
     xbegin, xend = 0, 0
@@ -32,8 +45,8 @@ def getXsize(img,miss=150,begin=0):
     x, y = img.shape
     ybegin,yend=0,0
     for i in range(begin, y):
-        if img[miss, i] != 255:
-            ybegin = i
+        if img[miss, i] < 252:            #最恶心的一张图，白色部分不是255而是254，所以改了这里
+            ybegin = i                    #必要的话还是写成不等于255，和getYsize对称
             break
     for k in range(ybegin + 1, y):
         if img[miss, k] == 255:
@@ -46,13 +59,13 @@ def getXsize(img,miss=150,begin=0):
 
 def imgSplit(img):
     x,y=img.shape
-    ybegin, yend = getYsize(img,150,50)           #修改最后一个参数为分割图片所在的Y轴位置
+    ybegin, yend = getYsize(img,500,0)           #修改最后一个参数为分割图片所在的Y轴位置
     print(ybegin), print(yend)
     xbegin,xend=0,0
     splitList=[]
-    while len(splitList)<4:
-        xbegin, xend = getXsize(img,150,xend)
-        if xend-xbegin<150:
+    while len(splitList) < 4:                    #修改while循环的结束值为x轴一行的图片数量
+        xbegin, xend = getXsize(img,250,xend)    #测试发现对于一些图片需要酌情调整第二个参数
+        if xend-xbegin<350:
             continue
         print(xbegin), print(xend)
         res = np.zeros((yend - ybegin, xend - xbegin))
@@ -68,7 +81,7 @@ def imgSave(imgList):
     for i in range(len(imgList)):
         imgToSave=Image.fromarray(imgList[i])
         imgToSave=imgToSave.convert('RGB')
-        imgToSave.save('F:\\GraduationProject\\IMG\\splitTest\\'+str(i+4)+'.jpg')
+        imgToSave.save('F:\\GraduationProject\\IMG\\splitTest\\5_'+str(i)+'.jpg')
 
 def imgTest(origin,img):
     plt.subplot(1,len(img)+1,1)
@@ -79,7 +92,8 @@ def imgTest(origin,img):
     plt.show()
 
 if __name__=='__main__':
-    imgArray=imgOpen('F:\\GraduationProject\\IMG\\pdfimg\\2.png')
+    imgArray=imgOpen('F:\\GraduationProject\\IMG\\pdfimg\\15.png')
     res=imgSplit(imgArray)
+    res=sameSize(res)
     #imgSave(res)                          #若不保存注释掉这行
     imgTest(imgArray,res)
