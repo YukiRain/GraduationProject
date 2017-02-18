@@ -79,7 +79,7 @@ def testPlot(org1,org2,img):
     plt.show()
 
 if __name__=='__main__':
-    img1=imgOpen('F:\\GraduationProject\\IMG\\pepsi1.jpg')
-    img2=imgOpen('F:\\GraduationProject\\IMG\\pepsi2.jpg')
+    img1=imgOpen('F:\\GraduationProject\\IMG\splitTest\\4.jpg')
+    img2=imgOpen('F:\\GraduationProject\\IMG\splitTest\\5.jpg')
     rec=testWave(img1,img2)
     testPlot(img1,img2,rec)
