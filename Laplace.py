@@ -34,7 +34,16 @@ def imgConv(imgArray,imgOperator):
     img=img*(255.0/img.max())
     return img
 
-# 封装一下求梯度的函数
+# 使用opencv中的Sobel算子的梯度计算函数
+def cvGradient(img):
+    xDiff=cv2.Sobel(img,cv2.CV_16S,1,0)
+    yDiff=cv2.Sobel(img,cv2.CV_16S,0,1)
+    stdXdiff=cv2.convertScaleAbs(xDiff)
+    stdYdiff=cv2.convertScaleAbs(yDiff)
+    gradient=np.sqrt(stdXdiff**2+stdYdiff**2)
+    return gradient
+
+# 自己实现的基于Prewitt或Laplace算子的求梯度的函数
 def getGradient(img):
     xDiff=imgConv(img,Prewitt_x)
     yDiff=imgConv(img,Prewitt_y)
@@ -94,8 +103,10 @@ def reconstruct1(lp1,lp2):
     for la,lb in zip(lp1,lp2):
         row,col,dpt=la.shape
         tmp=np.zeros((row,col))
-        la_gradient=getGradient(la)
-        lb_gradient=getGradient(lb)
+        # la_gradient=getGradient(la)
+        # lb_gradient=getGradient(lb)
+        la_gradient=cvGradient(la)
+        lb_gradient=cvGradient(lb)
         for i in range(row):
             for j in range(col):
                 tmp[i,j]=la[i,j][0] if la_gradient[i,j][0]>lb_gradient[i,j][0] else lb[i,j][0]
