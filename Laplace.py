@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy import signal
+from PIL import Image
 
 # 用于求梯度的Prewitt算子和Laplace算子
 Prewitt_x=np.array([[-1,0,0],
@@ -88,10 +88,10 @@ def getLaplacePyr(GaussPyrImg):
 # 对两个图像的拉普拉斯金字塔从最底层开始，对每个像素点周围的一片区域求其平均梯度
 # 新生成的重构金字塔每个对应像素点取值为平均梯度较大的那个像素点
 # 平均梯度高往往代表了一个像素点很可能是特征点，因此这样重构可以互补地融合两张图里的特征
-# 就是代码实现起来非常丧心病狂，而且计算量相当大。。。
 # 2.
 # 最高层采用0.5-0.5加权平均融合，下面每层用极大值融合
-# 代码实现稍微容易一些。。。
+# 3.
+# 测试效果感觉怪怪的，为什么会出现这种诡异的情况？
 # #########
 '''
 
@@ -101,7 +101,10 @@ def reconstruct1(lp1,lp2):
     assert dep==len(lp2)
     LS=[]
     for la,lb in zip(lp1,lp2):
-        row,col,dpt=la.shape
+        try:
+            row,col,dpt=la.shape
+        except:
+            row,col=la.shape
         tmp=np.zeros((row,col))
         # la_gradient=getGradient(la)
         # lb_gradient=getGradient(lb)
@@ -109,7 +112,10 @@ def reconstruct1(lp1,lp2):
         lb_gradient=cvGradient(lb)
         for i in range(row):
             for j in range(col):
-                tmp[i,j]=la[i,j][0] if la_gradient[i,j][0]>lb_gradient[i,j][0] else lb[i,j][0]
+                try:
+                    tmp[i,j]=la[i,j] if la_gradient[i,j]>lb_gradient[i,j] else lb[i,j]
+                except:
+                    tmp[i,j] = la[i,j][0] if la_gradient[i,j][0] > lb_gradient[i,j][0] else lb[i,j][0]
         LS.append(tmp)
     ls_reconstruct=LS[0]
     for i in xrange(1,dep-1):
@@ -123,22 +129,34 @@ def reconstruct2(lp1,lp2):
     assert dep==len(lp2)
     LS=[]
     ta,tb=lp1[0],lp2[0]
-    rowFirst,colFirst,dptFirst=ta.shape
+    try:
+        rowFirst,colFirst,dptFirst=ta.shape
+    except:
+        rowFirst,colFirst = ta.shape
     tmpFirst=np.zeros((rowFirst,colFirst))
     for i in xrange(rowFirst):
         for j in xrange(colFirst):
-            tmpFirst[i,j] = ta[i,j][0]/2 + tb[i,j][0]/2
+            try:
+                tmpFirst[i,j] = ta[i,j][0]/2 + tb[i,j][0]/2
+            except:
+                tmpFirst[i,j] = ta[i,j]/2 + tb[i,j]/2
     LS.append(tmpFirst)
     for k in range(dep):
         if k==0:
             continue
         la=lp1[k]
         lb=lp2[k]
-        row,col,dpt = la.shape
+        try:
+            row,col,dpt = la.shape
+        except:
+            row,col=la.shape
         tmp = np.zeros((row,col))
         for i in xrange(row):
             for j in xrange(col):
-                tmp[i,j] = la[i,j][0] if la[i,j][0] > lb[i,j][0] else lb[i,j][0]
+                try:
+                    tmp[i,j] = la[i,j][0] if la[i,j][0] > lb[i,j][0] else lb[i,j][0]
+                except:
+                    tmp[i,j] = la[i,j] if la[i,j] > lb[i,j] else lb[i,j]
         LS.append(tmp)
     ls_reconstruct=LS[0]
     for i in xrange(1,dep-1):
@@ -146,21 +164,26 @@ def reconstruct2(lp1,lp2):
         ls_reconstruct=cv2.add(sameSize(ls_reconstruct,LS[i]),LS[i])
     return ls_reconstruct
 
-def testFusion(org1,org2,result):
-    plt.subplot(131),plt.imshow(cv2.cvtColor(org1,cv2.COLOR_BGR2RGB))
+def testPlot(org1,org2,result):
+    plt.subplot(131),plt.imshow(org1,cmap='gray')
     plt.title("apple"),plt.xticks([]),plt.yticks([])
-    plt.subplot(132),plt.imshow(cv2.cvtColor(org2,cv2.COLOR_BGR2RGB))
+    plt.subplot(132),plt.imshow(org2,cmap='gray')
     plt.title("orange"),plt.xticks([]),plt.yticks([])
     plt.subplot(133),plt.imshow(result,cmap='gray')
     plt.title("laplace_pyramid"),plt.xticks([]),plt.yticks([])
     plt.show()
 
-if __name__=='__main__':
-    apple = cv2.imread("F:\\Python\\try\\BasicImageOperation\\apple.jpg")
-    orange = cv2.imread("F:\\Python\\try\\BasicImageOperation\\orange.jpg")
+def testFusion():
+    apple = Image.open("F:\\Python\\try\\BasicImageOperation\\pepsia.jpg")
+    orange = Image.open("F:\\Python\\try\\BasicImageOperation\\pepsib.jpg")
+    apple=np.array(apple)
+    orange=np.array(orange)
     gp_apple=getGaussPyr(apple,6)
     gp_orange=getGaussPyr(orange,6)
     lp_apple=getLaplacePyr(gp_apple)
     lp_orange=getLaplacePyr(gp_orange)
-    result=reconstruct1(lp_apple,lp_orange)
-    testFusion(apple,orange,result)
+    result=reconstruct2(lp_apple,lp_orange)
+    testPlot(apple,orange,result)
+
+if __name__=='__main__':
+    testFusion()
