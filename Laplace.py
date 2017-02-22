@@ -185,5 +185,6 @@ def testFusion():
     result=reconstruct2(lp_apple,lp_orange)
     testPlot(apple,orange,result)
 
+
 if __name__=='__main__':
     testFusion()

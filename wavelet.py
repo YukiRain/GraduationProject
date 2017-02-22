@@ -59,9 +59,11 @@ def testWave(img1,img2):
             tmp_row,tmp_col = array1.shape
             highFreq = np.zeros((tmp_row,tmp_col))
             hiWeight1,hiWeight2=varianceWeight(array1,array2)
+            grad1=calcGradient(array1);grad2=calcGradient(array2)
             for i in range(tmp_row):
                 for j in range(tmp_col):
-                    highFreq[i,j] = array1[i,j]*hiWeight1 + array2[i,j]*hiWeight2
+                    # highFreq[i,j] = array1[i,j]*hiWeight1 + array2[i,j]*hiWeight2
+                    highFreq[i,j]=array1[i,j] if grad1[i,j]>grad2[i,j] else array2[i,j]
             cvtArray.append(highFreq)
         recWave.append(tuple(cvtArray))
     return pywt.waverec2(recWave,'haar')
@@ -79,7 +81,7 @@ def testPlot(org1,org2,img):
     plt.show()
 
 if __name__=='__main__':
-    img1=imgOpen('F:\\GraduationProject\\IMG\splitTest\\4.jpg')
-    img2=imgOpen('F:\\GraduationProject\\IMG\splitTest\\5.jpg')
+    img1=imgOpen('F:\\Python\\try\\BasicImageOperation\\pepsia.jpg')
+    img2=imgOpen('F:\\Python\\try\\BasicImageOperation\\pepsib.jpg')
     rec=testWave(img1,img2)
     testPlot(img1,img2,rec)
