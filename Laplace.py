@@ -4,35 +4,19 @@ import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
 
-# 用于求梯度的Prewitt算子和Laplace算子
-Prewitt_x=np.array([[-1,0,0],
-                   [-1,0,1],
-                   [-1,0,1]])
-Prewitt_y=np.array([[-1,-1,-1],
-                    [0,0,0],
-                    [1,1,1]])
-Laplace=np.array([[0,1,0],
-                 [1,-4,1],
-                 [0,1,0]])
-Laplace_ex=np.array([[1,1,1],
-                    [1,-8,1],
-                    [1,1,1]])
-
-def imgConv(imgArray,imgOperator):
-    '''计算卷积
-        parameter:
-        imgArray 原灰度图像矩阵
-        imgOperator      算子
-        返回变换结果的矩阵
-    '''
-    img=imgArray.copy()
-    dim1,dim2,dst=img.shape
-    for x in range(1,dim1-1):
-        for y in range(1,dim2-1):
-            img[x,y]=(imgArray[(x-1):(x+2),(y-1):(y+2)]*imgOperator).sum()
-
-    img=img*(255.0/img.max())
-    return img
+'''
+# #########
+# 文献中提到了两种融合策略：
+# 1.(initial)
+# 对两个图像的拉普拉斯金字塔从最底层开始，对每个像素点开窗求窗口的平均梯度/方差
+# 新生成的重构金字塔每个对应像素点取值为平均梯度/方差较大的那个像素点
+# 2.
+# 最高层采用0.5-0.5加权平均融合，下面每层用极大值融合
+# 3.(Feb23)
+# 我将在小波变换中效果非常好的局部方差图像算法放到Laplace金字塔中，效果依旧不好
+# Laplace金字塔的重构图像在图像的灰度会畸变，也可能是我选的图像不合适，可能这种算法不适用于可见光波段图像
+# #########
+'''
 
 # 使用opencv中的Sobel算子的梯度计算函数
 def cvGradient(img):
@@ -41,14 +25,36 @@ def cvGradient(img):
     stdXdiff=cv2.convertScaleAbs(xDiff)
     stdYdiff=cv2.convertScaleAbs(yDiff)
     gradient=np.sqrt(stdXdiff**2+stdYdiff**2)
-    return gradient
+    return np.mean(gradient)
 
-# 自己实现的基于Prewitt或Laplace算子的求梯度的函数
-def getGradient(img):
-    xDiff=imgConv(img,Prewitt_x)
-    yDiff=imgConv(img,Prewitt_y)
-    gradient=np.sqrt(xDiff**2,yDiff**2)
-    return gradient
+# 计算量太大
+def getGradientImg(array):
+    row,col=array.shape
+    varImg=np.zeros((row,col))
+    for i in xrange(row):
+        for j in xrange(col):
+            up=i-5 if i-5>0 else 0
+            down=i+5 if i+5<row else row
+            left=j-5 if j-5>0 else 0
+            right=j+5 if j+5<col else col
+            window=array[up:down,left:right]
+            varImg[i,j]=cvGradient(window)
+    return varImg
+
+# 计算方差
+def getVarianceImg(array):
+    row,col=array.shape
+    varImg=np.zeros((row,col))
+    for i in xrange(row):
+        for j in xrange(col):
+            up=i-5 if i-5>0 else 0
+            down=i+5 if i+5<row else row
+            left=j-5 if j-5>0 else 0
+            right=j+5 if j+5<col else col
+            window=array[up:down,left:right]
+            mean,var=cv2.meanStdDev(window)
+            varImg[i,j]=var
+    return varImg
 
 # 使得img1的大小与img2相同
 def sameSize(img1, img2):
@@ -81,20 +87,6 @@ def getLaplacePyr(GaussPyrImg):
         LaplacePyr.append(L)
     return LaplacePyr
 
-'''
-# #########
-# 文献中提到了两种融合策略：
-# 1.
-# 对两个图像的拉普拉斯金字塔从最底层开始，对每个像素点周围的一片区域求其平均梯度
-# 新生成的重构金字塔每个对应像素点取值为平均梯度较大的那个像素点
-# 平均梯度高往往代表了一个像素点很可能是特征点，因此这样重构可以互补地融合两张图里的特征
-# 2.
-# 最高层采用0.5-0.5加权平均融合，下面每层用极大值融合
-# 3.
-# 测试效果感觉怪怪的，为什么会出现这种诡异的情况？
-# #########
-'''
-
 # 实现策略1
 def reconstruct1(lp1,lp2):
     dep=len(lp1)
@@ -106,14 +98,12 @@ def reconstruct1(lp1,lp2):
         except:
             row,col=la.shape
         tmp=np.zeros((row,col))
-        # la_gradient=getGradient(la)
-        # lb_gradient=getGradient(lb)
-        la_gradient=cvGradient(la)
-        lb_gradient=cvGradient(lb)
+        la_gradient=getVarianceImg(la)
+        lb_gradient=getVarianceImg(lb)
         for i in range(row):
             for j in range(col):
                 try:
-                    tmp[i,j]=la[i,j] if la_gradient[i,j]>lb_gradient[i,j] else lb[i,j]
+                    tmp[i,j] = la[i,j] if la_gradient[i,j] > lb_gradient[i,j] else lb[i,j]
                 except:
                     tmp[i,j] = la[i,j][0] if la_gradient[i,j][0] > lb_gradient[i,j][0] else lb[i,j][0]
         LS.append(tmp)
@@ -182,7 +172,7 @@ def testFusion():
     gp_orange=getGaussPyr(orange,6)
     lp_apple=getLaplacePyr(gp_apple)
     lp_orange=getLaplacePyr(gp_orange)
-    result=reconstruct2(lp_apple,lp_orange)
+    result=reconstruct1(lp_apple,lp_orange)
     testPlot(apple,orange,result)
 
 
