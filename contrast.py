@@ -14,79 +14,80 @@ import time
 补充：书上建议开窗大小10*10，DWT取3层，Laplace金字塔取2层
 '''
 
-class contrastFusion(object):
-    def __init__(self,img_src1,img_src2):
-        apple=Image.open(img_src1).convert('L')
-        orange=Image.open(img_src2).convert('L')
-        self.apple=np.array(apple)
-        self.orange=np.array(orange)
+def imgOpen(img_src1,img_src2):
+    apple=Image.open(img_src1).convert('L')
+    orange=Image.open(img_src2).convert('L')
+    appleArray=np.array(apple)
+    orangeArray=np.array(orange)
+    return appleArray,orangeArray
 
-    def _sameSize(self,img_std,img_cvt):
-        x,y=img_std.shape
-        pic_cvt=Image.fromarray(img_cvt)
-        pic_cvt.resize((x,y))
-        return np.array(pic_cvt)
+def _sameSize(img_std,img_cvt):
+    x,y=img_std.shape
+    pic_cvt=Image.fromarray(img_cvt)
+    pic_cvt.resize((x,y))
+    return np.array(pic_cvt)
 
-    def getLaplacePyr(self,img):
-        firstLevel=img.copy()
-        secondLevel=cv2.pyrDown(firstLevel)
-        lowFreq=cv2.pyrUp(secondLevel)
-        highFreq=cv2.subtract(firstLevel,self._sameSize(firstLevel,lowFreq))
-        return lowFreq,highFreq
+def getLaplacePyr(img):
+    firstLevel=img.copy()
+    secondLevel=cv2.pyrDown(firstLevel)
+    lowFreq=cv2.pyrUp(secondLevel)
+    highFreq=cv2.subtract(firstLevel,_sameSize(firstLevel,lowFreq))
+    return lowFreq,highFreq
 
-    def _getContrastValue(self,highWin,lowWin):
-        row,col=highWin.shape
-        contrastValue=0.00
-        for i in xrange(row):
-            for j in xrange(col):
-                contrastValue+=(float(highWin[i,j])/lowWin[i,j])**2
-        return contrastValue
+def _getContrastValue(highWin,lowWin):
+    row,col = highWin.shape
+    contrastValue = 0.00
+    for i in xrange(row):
+        for j in xrange(col):
+            contrastValue += (float(highWin[i,j])/lowWin[i,j])**2
+    return contrastValue
 
-    def getContrastImg(self,low,high):
-        row,col=low.shape
-        if low.shape!=high.shape:
-            low=self._sameSize(high,low)
-        contrastImg=np.zeros((row,col))
-        for i in xrange(row):
-            for j in xrange(col):
-                up=i-3 if i-3>0 else 0
-                down=i+3 if i+3<row else row
-                left=j-3 if j-3>0 else 0
-                right=j+3 if j+3<col else col
-                lowWin=low[up:down,left:right]
-                highWin=high[up:down,left:right]
-                contrastImg[i,j]=self._getContrastValue(highWin,lowWin)
-                # print contrastImg[i,j]
-        return contrastImg
+def getContrastImg(low,high):
+    row,col=low.shape
+    if low.shape!=high.shape:
+        low=_sameSize(high,low)
+    contrastImg=np.zeros((row,col))
+    cnt=0
+    for i in xrange(row):
+        for j in xrange(col):
+            up=i-3 if i-3>0 else 0
+            down=i+3 if i+3<row else row
+            left=j-3 if j-3>0 else 0
+            right=j+3 if j+3<col else col
+            lowWin=low[up:down,left:right]
+            highWin=high[up:down,left:right]
+            contrastImg[i,j]=_getContrastValue(highWin,lowWin)
+            print cnt
+            cnt+=1
+    return contrastImg
 
-    def _getVarianceWeight(self,apple,orange):
-        appleMean,appleVar=cv2.meanStdDev(apple)
-        orangeMean,orangeVar=cv2.meanStdDev(orange)
-        appleWeight=float(appleVar)/(appleVar+orangeVar)
-        orangeWeight=float(orangeVar)/(appleVar+orangeVar)
-        return appleWeight,orangeWeight
+def getVarianceWeight(apple,orange):
+    appleMean,appleVar=cv2.meanStdDev(apple)
+    orangeMean,orangeVar=cv2.meanStdDev(orange)
+    appleWeight=float(appleVar)/(appleVar+orangeVar)
+    orangeWeight=float(orangeVar)/(appleVar+orangeVar)
+    return appleWeight,orangeWeight
 
-    def getFusion(self):
-        lowApple,highApple=self.getLaplacePyr(self.apple)
-        lowOrange,highOrange=self.getLaplacePyr(self.orange)
-        contrastApple=self.getContrastImg(lowApple,highApple)
-        contrastOrange=self.getContrastImg(lowOrange,highOrange)
-        row,col=lowApple.shape
-        highFusion=np.zeros((row,col))
-        lowFusion=np.zeros((row,col))
-        # 开始处理低频
-        appleWeight,orangeWeight=self._getVarianceWeight(lowApple,lowOrange)
-        for i in xrange(row):
-            for j in xrange(col):
-                lowFusion[i,j]=appleWeight*lowApple[i,j]+orangeWeight*lowOrange[i,j]
-        # 开始处理高频
-        for i in xrange(row):
-            for j in xrange(col):
-                highFusion[i,j]=highApple[i,j] if contrastApple[i,j]>contrastOrange[i,j] else highOrange[i,j]
-        # 开始重建
-        fusionResult=cv2.add(highFusion,lowFusion)
-        return fusionResult
-
+def getFusion(apple,orange):
+    lowApple,highApple = getLaplacePyr(apple)
+    lowOrange,highOrange = getLaplacePyr(orange)
+    contrastApple = getContrastImg(lowApple,highApple)
+    contrastOrange = getContrastImg(lowOrange,highOrange)
+    row,col = lowApple.shape
+    highFusion = np.zeros((row,col))
+    lowFusion = np.zeros((row,col))
+    # 开始处理低频
+    appleWeight,orangeWeight = getVarianceWeight(lowApple,lowOrange)
+    for i in xrange(row):
+        for j in xrange(col):
+            lowFusion[i,j] = appleWeight*lowApple[i,j] + orangeWeight*lowOrange[i,j]
+    # 开始处理高频
+    for i in xrange(row):
+        for j in xrange(col):
+            highFusion[i,j] = highApple[i,j] if contrastApple[i,j] > contrastOrange[i,j] else highOrange[i,j]
+    # 开始重建
+    fusionResult = cv2.add(highFusion,lowFusion)
+    return fusionResult
 
 def getPlot(apple,orange,result):
     plt.subplot(131)
@@ -106,8 +107,6 @@ def getPlot(apple,orange,result):
 if __name__=='__main__':
     src1='F:\\Python\\try\\BasicImageOperation\\pepsia.jpg'
     src2='F:\\Python\\try\\BasicImageOperation\\pepsib.jpg'
-    fusion=contrastFusion(src1,src2)
-    result=fusion.getFusion()
-    getPlot(fusion.apple,fusion.orange,result)
-    time.sleep(10)
-    raw_input('unknown bug inside box')
+    apple,orange=imgOpen(src1,src2)
+    result=getFusion(apple,orange)
+    getPlot(apple,orange,result)
