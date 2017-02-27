@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -60,14 +61,14 @@ def getXsize(img,miss=150,begin=0):
 def imgSplit(img):
     x,y=img.shape
     ybegin, yend = getYsize(img,500,0)           #修改最后一个参数为分割图片所在的Y轴位置
-    print(ybegin), print(yend)
+    print(ybegin); print(yend)
     xbegin,xend=0,0
     splitList=[]
     while len(splitList) < 4:                    #修改while循环的结束值为x轴一行的图片数量
         xbegin, xend = getXsize(img,250,xend)    #测试发现对于一些图片需要酌情调整第二个参数
         if xend-xbegin<350:
             continue
-        print(xbegin), print(xend)
+        print(xbegin); print(xend)
         res = np.zeros((yend - ybegin, xend - xbegin))
         dim1, dim2 = res.shape
         for i in range(dim1):

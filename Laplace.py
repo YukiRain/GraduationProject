@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
+import datetime
 
 '''
 # #########
@@ -41,7 +42,7 @@ def getGradientImg(array):
             varImg[i,j]=cvGradient(window)
     return varImg
 
-# 计算方差
+# 计算方差图像
 def getVarianceImg(array):
     row,col=array.shape
     varImg=np.zeros((row,col))
@@ -168,11 +169,16 @@ def testFusion():
     orange = Image.open("F:\\Python\\try\\BasicImageOperation\\pepsib.jpg")
     apple=np.array(apple)
     orange=np.array(orange)
+    beginTime=datetime.datetime.now()
+    print beginTime
     gp_apple=getGaussPyr(apple,6)
     gp_orange=getGaussPyr(orange,6)
     lp_apple=getLaplacePyr(gp_apple)
     lp_orange=getLaplacePyr(gp_orange)
     result=reconstruct1(lp_apple,lp_orange)
+    endTime=datetime.datetime.now()
+    print endTime
+    print 'Runtime: '+str(endTime-beginTime)
     testPlot(apple,orange,result)
 
 
