@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import cv2
 from PIL import Image
 import datetime
+import pywt
+
+# 以下强行用Python宏定义变量
+halfWindowSize=9
 
 '''
 来自敬忠良，肖刚，李振华《图像融合——理论与分析》P85：基于像素清晰度的融合规则
@@ -28,6 +32,35 @@ def _sameSize(img_std,img_cvt):
     pic_cvt=Image.fromarray(img_cvt)
     pic_cvt.resize((x,y))
     return np.array(pic_cvt)
+
+# 小波变换
+def getWaveImg(apple,orange):
+    beginTime=datetime.datetime.now()
+    print beginTime
+    lowApple,highApple=pywt.wavedec2(apple,'haar',level=1)
+    lowOrange,highOrange=pywt.wavedec2(orange,'haar',level=1)
+    lowFusion=np.zeros(lowApple.shape)
+    # 开始处理低频: 方差权重比
+    lowAppleWeight,lowOrangeWeight=getVarianceWeight(lowApple,lowOrange)
+    row,col=lowOrange.shape
+    for i in xrange(row):
+        for j in xrange(col):
+            lowFusion[i,j]=lowAppleWeight*lowApple[i,j]+lowOrangeWeight*lowOrange[i,j]
+    # 开始处理高频: 清晰度取大
+    highFusionList=[]
+    for la,lb in zip(highApple,highOrange):
+        assert la.shape==lb.shape
+        contrastApple=getContrastImg(lowApple,la)
+        contrastOrange=getContrastImg(lowOrange,lb)
+        highFusion=np.zeros(la.shape)
+        for i in xrange(row):
+            for j in xrange(col):
+                highFusion[i,j]=la[i,j] if contrastApple[i,j]>contrastOrange[i,j] else lb[i,j]
+        highFusionList.append(highFusion)
+    endTime=datetime.datetime.now()
+    print endTime
+    print 'Runtime: '+str(endTime-beginTime)
+    return pywt.waverec2([lowFusion,tuple(highFusionList)],'haar')
 
 # 求Laplace金字塔
 def getLaplacePyr(img):
@@ -58,10 +91,10 @@ def getContrastImg(low,high):
             contrastVal[i,j]=(float(high[i,j])/low[i,j])**2
     for i in xrange(row):
         for j in xrange(col):
-            up=i-5 if i-5>0 else 0
-            down=i+5 if i+5<row else row
-            left=j-5 if j-5>0 else 0
-            right=j+5 if j+5<col else col
+            up=i-halfWindowSize if i-halfWindowSize>0 else 0
+            down=i+halfWindowSize if i+halfWindowSize<row else row
+            left=j-halfWindowSize if j-halfWindowSize>0 else 0
+            right=j+halfWindowSize if j+halfWindowSize<col else col
             contrastWindow=contrastVal[up:down,left:right]
             contrastImg[i,j]=contrastWindow.sum()
     return contrastImg
@@ -123,5 +156,7 @@ if __name__=='__main__':
     src1='F:\\Python\\try\\BasicImageOperation\\pepsia.jpg'
     src2='F:\\Python\\try\\BasicImageOperation\\pepsib.jpg'
     apple,orange=imgOpen(src1,src2)
-    result=getFusion(apple,orange)
-    getPlot(apple,orange,result)
+    waveResult=getWaveImg(apple,orange)
+    getPlot(apple,orange,waveResult)
+    # result=getFusion(apple,orange)
+    # getPlot(apple,orange,result)
