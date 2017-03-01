@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 import cv2
+from datetime import datetime
 
 '''
 论文中的两种方案：
@@ -54,19 +55,15 @@ def calcGradient(img):
     return gradient
 
 def testWave(img1,img2):
-    transf1=pywt.wavedec2(img1,'haar',level=4)
-    transf2=pywt.wavedec2(img2,'haar',level=4)
+    transf1=pywt.wavedec2(img1,'haar',level=6)
+    transf2=pywt.wavedec2(img2,'haar',level=6)
     assert len(transf1)==len(transf2)
     recWave=[]
     for k in range(len(transf1)):
         # 处理低频分量
         if k==0:
             loWeight1,loWeight2 = varianceWeight(transf1[0],transf2[0])
-            lowFreq = np.zeros(transf2[0].shape)
-            row,col = transf1[0].shape
-            for i in range(row):
-                for j in range(col):
-                    lowFreq[i,j] = loWeight1*transf1[0][i,j] + loWeight2*transf2[0][i,j]
+            lowFreq=loWeight1*transf1[0]+loWeight2*transf2[0]
             recWave.append(lowFreq)
             continue
         # 处理高频分量
@@ -97,5 +94,10 @@ def testPlot(org1,org2,img):
 if __name__=='__main__':
     img1=imgOpen('F:\\Python\\try\\BasicImageOperation\\pepsia.jpg')
     img2=imgOpen('F:\\Python\\try\\BasicImageOperation\\pepsib.jpg')
+    beginTime=datetime.now()
+    print(beginTime)
     rec=testWave(img1,img2)
+    endTime=datetime.now()
+    print(endTime)
+    print(str(endTime-beginTime))
     testPlot(img1,img2,rec)

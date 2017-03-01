@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+from math import log
 from PIL import Image
 import datetime
 import pywt
@@ -33,34 +34,33 @@ def _sameSize(img_std,img_cvt):
     pic_cvt.resize((x,y))
     return np.array(pic_cvt)
 
-# 小波变换
+# 小波变换的层数不能太高，Image模块的resize不能变换太小的矩阵，不相同大小的矩阵在计算对比度时会数组越界
 def getWaveImg(apple,orange):
-    beginTime=datetime.datetime.now()
-    print beginTime
-    lowApple,highApple=pywt.wavedec2(apple,'haar',level=1)
-    lowOrange,highOrange=pywt.wavedec2(orange,'haar',level=1)
-    lowFusion=np.zeros(lowApple.shape)
-    # 开始处理低频: 方差权重比
-    lowAppleWeight,lowOrangeWeight=getVarianceWeight(lowApple,lowOrange)
-    row,col=lowOrange.shape
-    for i in xrange(row):
-        for j in xrange(col):
-            lowFusion[i,j]=lowAppleWeight*lowApple[i,j]+lowOrangeWeight*lowOrange[i,j]
-    # 开始处理高频: 清晰度取大
-    highFusionList=[]
-    for la,lb in zip(highApple,highOrange):
-        assert la.shape==lb.shape
-        contrastApple=getContrastImg(lowApple,la)
-        contrastOrange=getContrastImg(lowOrange,lb)
-        highFusion=np.zeros(la.shape)
-        for i in xrange(row):
-            for j in xrange(col):
-                highFusion[i,j]=la[i,j] if contrastApple[i,j]>contrastOrange[i,j] else lb[i,j]
-        highFusionList.append(highFusion)
-    endTime=datetime.datetime.now()
-    print endTime
-    print 'Runtime: '+str(endTime-beginTime)
-    return pywt.waverec2([lowFusion,tuple(highFusionList)],'haar')
+    appleWave=pywt.wavedec2(apple,'haar',level=4)
+    orangeWave=pywt.wavedec2(orange,'haar',level=4)
+    lowApple=appleWave[0];lowOrange=orangeWave[0]
+    # 以下处理低频
+    lowAppleWeight,lowOrangeWeight = getVarianceWeight(lowApple,lowOrange)
+    lowFusion = lowAppleWeight*lowApple + lowOrangeWeight*lowOrange
+    # 以下处理高频
+    for hi in range(1,5):
+        waveRec=[]
+        for highApple,highOrange in zip(appleWave[hi],orangeWave[hi]):
+            highFusion = np.zeros(highApple.shape)
+            contrastApple = getContrastImg(lowApple,highApple)
+            contrastOrange = getContrastImg(lowOrange,highOrange)
+            row,col = highApple.shape
+            for i in xrange(row):
+                for j in xrange(col):
+                    if contrastApple[i,j] > contrastOrange[i,j]:
+                        highFusion[i,j] = highApple[i,j]
+                    else:
+                        highFusion[i,j] = highOrange[i,j]
+            waveRec.append(highFusion)
+        recwave=(lowFusion,tuple(waveRec))
+        lowFusion=pywt.idwt2(recwave,'haar')
+        lowApple=lowFusion;lowOrange=lowFusion
+    return lowFusion
 
 # 求Laplace金字塔
 def getLaplacePyr(img):
@@ -70,7 +70,7 @@ def getLaplacePyr(img):
     highFreq=cv2.subtract(firstLevel,_sameSize(firstLevel,lowFreq))
     return lowFreq,highFreq
 
-# 计算对比度，优化后不需要这个函数了，扔在这里看看公式就行了
+# 计算对比度，优化后不需要这个函数了，扔在这里看看公式就行
 def _getContrastValue(highWin,lowWin):
     row,col = highWin.shape
     contrastValue = 0.00
@@ -84,11 +84,8 @@ def getContrastImg(low,high):
     row,col=low.shape
     if low.shape!=high.shape:
         low=_sameSize(high,low)
-    contrastVal=np.zeros((row,col))
     contrastImg=np.zeros((row,col))
-    for i in xrange(row):
-        for j in xrange(col):
-            contrastVal[i,j]=(float(high[i,j])/low[i,j])**2
+    contrastVal=(high/low)**2
     for i in xrange(row):
         for j in xrange(col):
             up=i-halfWindowSize if i-halfWindowSize>0 else 0
@@ -108,9 +105,7 @@ def getVarianceWeight(apple,orange):
     return appleWeight,orangeWeight
 
 # 函数返回融合后的图像矩阵
-def getFusion(apple,orange):
-    beginTime=datetime.datetime.now()
-    print beginTime
+def getPyrFusion(apple,orange):
     lowApple,highApple = getLaplacePyr(apple)
     lowOrange,highOrange = getLaplacePyr(orange)
     contrastApple = getContrastImg(lowApple,highApple)
@@ -130,9 +125,6 @@ def getFusion(apple,orange):
             highFusion[i,j] = highApple[i,j] if contrastApple[i,j] > contrastOrange[i,j] else highOrange[i,j]
     # 开始重建
     fusionResult = cv2.add(highFusion,lowFusion)
-    endTime=datetime.datetime.now()
-    print endTime
-    print 'Runtime: '+str(endTime-beginTime)
     return fusionResult
 
 # 绘图函数
@@ -151,12 +143,35 @@ def getPlot(apple,orange,result):
     plt.axis('off')
     plt.show()
 
+# 画四张图的函数，为了方便同时比较
+def cmpPlot(src1,src2,wave,pyr):
+    plt.subplot(221)
+    plt.imshow(apple,cmap='gray')
+    plt.title('SRC1')
+    plt.axis('off')
+    plt.subplot(222)
+    plt.imshow(orange,cmap='gray')
+    plt.title('SRC2')
+    plt.axis('off')
+    plt.subplot(223)
+    plt.imshow(wave,cmap='gray')
+    plt.title('WAVELET')
+    plt.axis('off')
+    plt.subplot(224)
+    plt.imshow(pyr,cmap='gray')
+    plt.title('LAPLACE PYR')
+    plt.axis('off')
+    plt.show()
 
 if __name__=='__main__':
-    src1='F:\\Python\\try\\BasicImageOperation\\pepsia.jpg'
-    src2='F:\\Python\\try\\BasicImageOperation\\pepsib.jpg'
+    src1='F:\\Python\\try\\BasicImageOperation\\disk1.jpg'
+    src2='F:\\Python\\try\\BasicImageOperation\\disk2.jpg'
     apple,orange=imgOpen(src1,src2)
+    beginTime=datetime.datetime.now()
+    print(beginTime)
     waveResult=getWaveImg(apple,orange)
-    getPlot(apple,orange,waveResult)
-    # result=getFusion(apple,orange)
-    # getPlot(apple,orange,result)
+    pyrResult=getPyrFusion(apple,orange)
+    endTime=datetime.datetime.now()
+    print(endTime)
+    print('Runtime: '+str(endTime-beginTime))
+    cmpPlot(apple,orange,waveResult,pyrResult)

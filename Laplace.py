@@ -48,10 +48,10 @@ def getVarianceImg(array):
     varImg=np.zeros((row,col))
     for i in xrange(row):
         for j in xrange(col):
-            up=i-5 if i-5>0 else 0
-            down=i+5 if i+5<row else row
-            left=j-5 if j-5>0 else 0
-            right=j+5 if j+5<col else col
+            up=i-9 if i-9>0 else 0
+            down=i+9 if i+9<row else row
+            left=j-9 if j-9>0 else 0
+            right=j+9 if j+9<col else col
             window=array[up:down,left:right]
             mean,var=cv2.meanStdDev(window)
             varImg[i,j]=var
@@ -124,17 +124,9 @@ def reconstruct2(lp1,lp2):
         rowFirst,colFirst,dptFirst=ta.shape
     except:
         rowFirst,colFirst = ta.shape
-    tmpFirst=np.zeros((rowFirst,colFirst))
-    for i in xrange(rowFirst):
-        for j in xrange(colFirst):
-            try:
-                tmpFirst[i,j] = ta[i,j][0]/2 + tb[i,j][0]/2
-            except:
-                tmpFirst[i,j] = ta[i,j]/2 + tb[i,j]/2
+    tmpFirst=ta*0.5+tb*0.5
     LS.append(tmpFirst)
-    for k in range(dep):
-        if k==0:
-            continue
+    for k in range(1,dep):
         la=lp1[k]
         lb=lp2[k]
         try:
@@ -163,6 +155,7 @@ def testPlot(org1,org2,result):
     plt.subplot(133),plt.imshow(result,cmap='gray')
     plt.title("laplace_pyramid"),plt.xticks([]),plt.yticks([])
     plt.show()
+    # input('mada???')
 
 def testFusion():
     apple = Image.open("F:\\Python\\try\\BasicImageOperation\\pepsia.jpg")
@@ -171,8 +164,8 @@ def testFusion():
     orange=np.array(orange)
     beginTime=datetime.datetime.now()
     print beginTime
-    gp_apple=getGaussPyr(apple,6)
-    gp_orange=getGaussPyr(orange,6)
+    gp_apple=getGaussPyr(apple,4)
+    gp_orange=getGaussPyr(orange,4)
     lp_apple=getLaplacePyr(gp_apple)
     lp_orange=getLaplacePyr(gp_orange)
     result=reconstruct1(lp_apple,lp_orange)
