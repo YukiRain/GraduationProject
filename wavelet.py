@@ -3,7 +3,7 @@ import pywt
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-import cv2
+import cv2,os
 from datetime import datetime
 
 '''
@@ -17,10 +17,18 @@ from datetime import datetime
 5，现用局部方差的方法对多聚焦图像效果非常完美
 '''
 
+img_dir='F:\\GraduationProject\\IMG\\splitTest\\'
+save_dir='F:\\GraduationProject\\IMG\\result\\'
+
 def imgOpen(path):
-    img=Image.open(path).convert('L')
+    img=Image.open(path).convert('L').resize((512,512))
     imgArray=np.array(img)
     return imgArray
+
+# 严格的变换尺寸
+def _sameSize(img_std,img_cvt):
+    x,y=img_std.shape
+    return img_std,img_cvt[:x,:y]
 
 # 对于低频分量，计算两图的权重比
 def varianceWeight(img1,img2):
@@ -91,13 +99,32 @@ def testPlot(org1,org2,img):
     plt.axis('off')
     plt.show()
 
-if __name__=='__main__':
-    img1=imgOpen('F:\\Python\\try\\BasicImageOperation\\pepsia.jpg')
-    img2=imgOpen('F:\\Python\\try\\BasicImageOperation\\pepsib.jpg')
+def runTest(src1=None,src2=None,isPlot=True):
+    if src1==None or src2==None:
+        img1=imgOpen('F:\\Python\\try\\BasicImageOperation\\pepsia.jpg')
+        img2=imgOpen('F:\\Python\\try\\BasicImageOperation\\pepsib.jpg')
+    else:
+        img1=src1;img2=src2
     beginTime=datetime.now()
     print(beginTime)
     rec=testWave(img1,img2)
     endTime=datetime.now()
     print(endTime)
     print(str(endTime-beginTime))
-    testPlot(img1,img2,rec)
+    if isPlot:
+        testPlot(img1,img2,rec)
+    return rec
+
+
+if __name__=='__main__':
+    imgList=os.listdir(img_dir)
+    imgList.sort()
+    for img_index in range(21):
+        src_list = filter(lambda x:int(x.split('_')[0]) == img_index, imgList)
+        apple=imgOpen(img_dir+src_list[0])
+        orange=imgOpen(img_dir+src_list[1])
+        wave=runTest(src1=apple,src2=orange,isPlot=False)
+        wave *= 255.0/(float(wave.max()))
+        Image.fromarray(wave).convert('RGB').save(save_dir+str(img_index)+'_wave_var.jpg')
+        print 'SAVING NO %d RESULT' % (img_index)
+    print 'FINISHED.'

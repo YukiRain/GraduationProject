@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
-import cv2
+import cv2,os
 from math import log
 from PIL import Image
 import datetime
@@ -9,6 +9,10 @@ import pywt
 
 # 以下强行用Python宏定义变量
 halfWindowSize=9
+src1_path = 'F:\\Python\\try\\BasicImageOperation\\disk1.jpg'
+src2_path = 'F:\\Python\\try\\BasicImageOperation\\disk2.jpg'
+img_dir='F:\\GraduationProject\\IMG\\splitTest\\'
+save_dir='F:\\GraduationProject\\IMG\\result\\'
 
 '''
 来自敬忠良，肖刚，李振华《图像融合——理论与分析》P85：基于像素清晰度的融合规则
@@ -21,8 +25,8 @@ halfWindowSize=9
 '''
 
 def imgOpen(img_src1,img_src2):
-    apple=Image.open(img_src1).convert('L')
-    orange=Image.open(img_src2).convert('L')
+    apple=Image.open(img_src1).convert('L').resize((512,512))
+    orange=Image.open(img_src2).convert('L').resize((512,512))
     appleArray=np.array(apple)
     orangeArray=np.array(orange)
     return appleArray,orangeArray
@@ -30,9 +34,7 @@ def imgOpen(img_src1,img_src2):
 # 严格的变换尺寸
 def _sameSize(img_std,img_cvt):
     x,y=img_std.shape
-    pic_cvt=Image.fromarray(img_cvt)
-    pic_cvt.resize((x,y))
-    return np.array(pic_cvt)
+    return img_std,img_cvt[:x,:y]
 
 # 小波变换的层数不能太高，Image模块的resize不能变换太小的矩阵，不相同大小的矩阵在计算对比度时会数组越界
 def getWaveImg(apple,orange):
@@ -67,7 +69,7 @@ def getLaplacePyr(img):
     firstLevel=img.copy()
     secondLevel=cv2.pyrDown(firstLevel)
     lowFreq=cv2.pyrUp(secondLevel)
-    highFreq=cv2.subtract(firstLevel,_sameSize(firstLevel,lowFreq))
+    highFreq=cv2.subtract(firstLevel,lowFreq)
     return lowFreq,highFreq
 
 # 计算对比度，优化后不需要这个函数了，扔在这里看看公式就行
@@ -79,7 +81,7 @@ def _getContrastValue(highWin,lowWin):
             contrastValue += (float(highWin[i,j])/lowWin[i,j])**2
     return contrastValue
 
-# 先求出每个点的(hi/lo)**2，再用numpy的sum（C语言库）求和
+# 先求出每个点的(hi/lo)**2，再用numpy的sum求和
 def getContrastImg(low,high):
     row,col=low.shape
     if low.shape!=high.shape:
@@ -144,7 +146,7 @@ def getPlot(apple,orange,result):
     plt.show()
 
 # 画四张图的函数，为了方便同时比较
-def cmpPlot(src1,src2,wave,pyr):
+def cmpPlot(apple,orange,wave,pyr):
     plt.subplot(221)
     plt.imshow(apple,cmap='gray')
     plt.title('SRC1')
@@ -163,10 +165,14 @@ def cmpPlot(src1,src2,wave,pyr):
     plt.axis('off')
     plt.show()
 
-if __name__=='__main__':
-    src1='F:\\Python\\try\\BasicImageOperation\\disk1.jpg'
-    src2='F:\\Python\\try\\BasicImageOperation\\disk2.jpg'
-    apple,orange=imgOpen(src1,src2)
+def runTest(src1=None,src2=None,isplot=True):
+    if src1==None and src2==None:
+        apple,orange=imgOpen(src1,src2)
+    else:
+        tmp_apple=Image.fromarray(src1).resize((512,512))
+        apple=np.array(tmp_apple)
+        tmp_orange=Image.fromarray(src2).resize((512,512))
+        orange=np.array(tmp_orange)
     beginTime=datetime.datetime.now()
     print(beginTime)
     waveResult=getWaveImg(apple,orange)
@@ -174,4 +180,21 @@ if __name__=='__main__':
     endTime=datetime.datetime.now()
     print(endTime)
     print('Runtime: '+str(endTime-beginTime))
-    cmpPlot(apple,orange,waveResult,pyrResult)
+    if isplot:
+        cmpPlot(apple,orange,waveResult,pyrResult)
+    return waveResult,pyrResult
+
+
+if __name__=='__main__':
+    imgList=os.listdir(img_dir)
+    imgList.sort()
+    for img_index in range(21):
+        src_list = filter(lambda x:int(x.split('_')[0]) == img_index, imgList)
+        apple,orange=imgOpen(img_dir+src_list[0],img_dir+src_list[1])
+        wave,pyr=runTest(src1=apple,src2=orange,isplot=False)
+        wave *= 255.0/(float(wave.max()))
+        pyr *= 255.0/(float(pyr.max()))
+        Image.fromarray(wave).convert('RGB').save(save_dir+str(img_index)+'_wave_contrast.jpg')
+        Image.fromarray(pyr).convert('RGB').save(save_dir+str(img_index)+'_pyr_contrast.jpg')
+        print 'SAVING NO %d RESULT' % (img_index)
+    print 'FINISHED.'

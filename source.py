@@ -3,7 +3,7 @@ from PyQt5 import QtWidgets
 from PyQt5 import QtCore
 from PyQt5.QtGui import QPixmap
 from PIL import Image
-import ImageFusion as fus
+import py3fus as ImageFusion
 import sys,os
 
 class MainWin(QtWidgets.QMainWindow):
@@ -53,9 +53,9 @@ class MainWin(QtWidgets.QMainWindow):
                                           '未打开文件',
                                           QtWidgets.QMessageBox.Cancel)
         else:
-            origin = fus.openFiles(self.__win)
-            af = fus.averageFusion(origin)
-            fus.img_show(origin, af, self.__setting['axis on'])
+            origin = ImageFusion.openFiles(self.__win)
+            af = ImageFusion.averageFusion(origin)
+            ImageFusion.img_show(origin, af, self.__setting['axis on'])
             save = Image.fromarray(af)
             save.save('F:\\GraduationProject\\Source\\cache\\1.jpg')
             label = QtWidgets.QLabel()

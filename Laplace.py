@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import cv2
+import cv2,os
 import numpy as np
 from matplotlib import pyplot as plt
 from PIL import Image
@@ -19,6 +19,9 @@ import datetime
 # #########
 '''
 
+img_dir='F:\\GraduationProject\\IMG\\splitTest\\'
+save_dir='F:\\GraduationProject\\IMG\\result\\'
+
 # 使用opencv中的Sobel算子的梯度计算函数
 def cvGradient(img):
     xDiff=cv2.Sobel(img,cv2.CV_16S,1,0)
@@ -27,6 +30,11 @@ def cvGradient(img):
     stdYdiff=cv2.convertScaleAbs(yDiff)
     gradient=np.sqrt(stdXdiff**2+stdYdiff**2)
     return np.mean(gradient)
+
+# 严格的变换尺寸
+def _sameSize(img_std,img_cvt):
+    x,y=img_std.shape
+    return img_std,img_cvt[:x,:y]
 
 # 计算量太大
 def getGradientImg(array):
@@ -147,33 +155,52 @@ def reconstruct2(lp1,lp2):
         ls_reconstruct=cv2.add(sameSize(ls_reconstruct,LS[i]),LS[i])
     return ls_reconstruct
 
-def testPlot(org1,org2,result):
-    plt.subplot(131),plt.imshow(org1,cmap='gray')
+def testPlot(org1,org2,result1,result2):
+    plt.subplot(221),plt.imshow(org1,cmap='gray')
     plt.title("apple"),plt.xticks([]),plt.yticks([])
-    plt.subplot(132),plt.imshow(org2,cmap='gray')
+    plt.subplot(222),plt.imshow(org2,cmap='gray')
     plt.title("orange"),plt.xticks([]),plt.yticks([])
-    plt.subplot(133),plt.imshow(result,cmap='gray')
+    plt.subplot(223),plt.imshow(result1,cmap='gray')
+    plt.title("laplace_pyramid"),plt.xticks([]),plt.yticks([])
+    plt.subplot(224),plt.imshow(result2,cmap='gray')
     plt.title("laplace_pyramid"),plt.xticks([]),plt.yticks([])
     plt.show()
-    # input('mada???')
 
-def testFusion():
-    apple = Image.open("F:\\Python\\try\\BasicImageOperation\\pepsia.jpg")
-    orange = Image.open("F:\\Python\\try\\BasicImageOperation\\pepsib.jpg")
-    apple=np.array(apple)
-    orange=np.array(orange)
+def runTest(src1=None,src2=None,isPlot=True):
+    if src1==None or src2==None:
+        apple = Image.open("F:\\Python\\try\\BasicImageOperation\\pepsia.jpg")
+        orange = Image.open("F:\\Python\\try\\BasicImageOperation\\pepsib.jpg")
+        apple=np.array(apple)
+        orange=np.array(orange)
+    else:
+        apple=src1;orange=src2
     beginTime=datetime.datetime.now()
     print beginTime
     gp_apple=getGaussPyr(apple,4)
     gp_orange=getGaussPyr(orange,4)
     lp_apple=getLaplacePyr(gp_apple)
     lp_orange=getLaplacePyr(gp_orange)
-    result=reconstruct1(lp_apple,lp_orange)
+    result1=reconstruct1(lp_apple,lp_orange)
+    result2=reconstruct2(lp_apple,lp_orange)
     endTime=datetime.datetime.now()
     print endTime
     print 'Runtime: '+str(endTime-beginTime)
-    testPlot(apple,orange,result)
+    if isPlot:
+        testPlot(apple,orange,result1,result2)
+    return result1,result2
 
 
 if __name__=='__main__':
-    testFusion()
+    imgList=os.listdir(img_dir)
+    imgList.sort()
+    for img_index in range(21):
+        src_list = filter(lambda x:int(x.split('_')[0]) == img_index, imgList)
+        apple=Image.open(img_dir+src_list[0]).convert('L').resize((512,512))
+        orange=Image.open(img_dir+src_list[1]).convert('L').resize((512,512))
+        pyr1,pyr2=runTest(src1=np.array(apple),src2=np.array(orange),isPlot=False)
+        pyr1 *= 255.0/(float(pyr1.max()))
+        pyr2 *= 255.0/(float(pyr2.max()))
+        Image.fromarray(pyr1).convert('RGB').save(save_dir+str(img_index)+'_pyr1.jpg')
+        Image.fromarray(pyr2).convert('RGB').save(save_dir+str(img_index)+'_pyr2.jpg')
+        print 'SAVING NO %d RESULT' % (img_index)
+    print 'FINISHED.'
